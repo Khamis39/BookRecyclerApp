@@ -78,7 +78,6 @@ public class MessageActivity extends AppCompatActivity {
     //views
     private CircleImageView profile_image;
     private TextView usernameTV;
-    private ImageButton sendBtn, gpsBtn;
     private EditText msgET;
     private ProgressDialog pd;
 
@@ -121,9 +120,9 @@ public class MessageActivity extends AppCompatActivity {
         //initialize views
         profile_image = findViewById(R.id.msg_profile_image);
         usernameTV = findViewById(R.id.msg_username);
-        sendBtn = findViewById(R.id.msg_btn_send);
+        ImageButton sendBtn = findViewById(R.id.msg_btn_send);
         msgET = findViewById(R.id.msg_text_send);
-        gpsBtn = findViewById(R.id.gps_btn_send);
+        ImageButton gpsBtn = findViewById(R.id.gps_btn_send);
         pd = new ProgressDialog(MessageActivity.this);
 
         //initialize firebase
@@ -142,6 +141,7 @@ public class MessageActivity extends AppCompatActivity {
             public void onSuccess(DocumentSnapshot documentSnapshot) {
                 if (documentSnapshot != null) {
                     UserModel user = documentSnapshot.toObject(UserModel.class);
+                    assert user != null;
                     usernameTV.setText(user.getName());
                     if (user.getImg_url().equals("default")) {
                         profile_image.setImageResource(R.drawable.user_profile);
@@ -154,8 +154,8 @@ public class MessageActivity extends AppCompatActivity {
         }).addOnFailureListener(new OnFailureListener() {
             @Override
             public void onFailure(@NonNull Exception e) {
-                Toast.makeText(MessageActivity.this, "Something went wrong\n  please try again later" , Toast.LENGTH_LONG).show();
-                Log.d("MessageActivity", "onFailure(Loading reciever info): " +  e.getMessage());
+                Toast.makeText(MessageActivity.this, "Something went wrong\n  please try again later", Toast.LENGTH_LONG).show();
+                Log.d("MessageActivity", "onFailure(Loading reciever info): " + e.getMessage());
             }
         });
 
@@ -179,7 +179,7 @@ public class MessageActivity extends AppCompatActivity {
             public void onClick(View view) {
 
                 //check Internet
-                if(!Utils.isConnectedToInternet(MessageActivity.this)){
+                if (!Utils.isConnectedToInternet(MessageActivity.this)) {
                     Toast.makeText(MessageActivity.this, "Check your Internet connection", Toast.LENGTH_SHORT).show();
                     return;
                 }
@@ -199,16 +199,16 @@ public class MessageActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 //check if location permission is granted
-                if(ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED){
+                if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     ActivityCompat.requestPermissions(
                             MessageActivity.this,
                             new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                             LOCATION_REQUEST_CODE
                     );
-                }else{
+                } else {
 
                     //check Internet
-                    if(!Utils.isConnectedToInternet(MessageActivity.this)){
+                    if (!Utils.isConnectedToInternet(MessageActivity.this)) {
                         Toast.makeText(MessageActivity.this, "Check your Internet connection", Toast.LENGTH_SHORT).show();
                         return;
                     }
@@ -224,7 +224,7 @@ public class MessageActivity extends AppCompatActivity {
     //this method get the current location(Latitude and longitude) and call sendLocation()
     private void getCurrentLocation() {
         //check if GPS on
-        if(locationEnabled()){
+        if (locationEnabled()) {
             //gps is on, proceed to send the message
             pd.setMessage("Sending Location...");
             pd.setCancelable(false);
@@ -237,25 +237,35 @@ public class MessageActivity extends AppCompatActivity {
             locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
 
             //send location request
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                // here to request the missing permissions, and then overriding
+                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                //                                          int[] grantResults)
+                // to handle the case where the user grants the permission. See the documentation
+                // for ActivityCompat#requestPermissions for more details.
+                return;
+            }
             LocationServices.getFusedLocationProviderClient(this)
-                    .requestLocationUpdates(locationRequest, new LocationCallback(){
-                @Override
-                public void onLocationResult(LocationResult locationResult) {
-                    super.onLocationResult(locationResult);
-                    LocationServices.getFusedLocationProviderClient(MessageActivity.this).
-                            removeLocationUpdates(this);
+                    .requestLocationUpdates(locationRequest, new LocationCallback() {
+                        @Override
+                        public void onLocationResult(LocationResult locationResult) {
+                            super.onLocationResult(locationResult);
+                            LocationServices.getFusedLocationProviderClient(MessageActivity.this).
+                                    removeLocationUpdates(this);
 
-                    if(locationResult != null && locationResult.getLocations().size() > 0){
-                        int latestLocationIndex = locationResult.getLocations().size() -1;
+                            if (locationResult != null && locationResult.getLocations().size() > 0) {
+                                int latestLocationIndex = locationResult.getLocations().size() - 1;
 
-                        double latitude = locationResult.getLocations().get(latestLocationIndex).getLatitude();
-                        double longitude = locationResult.getLocations().get(latestLocationIndex).getLongitude();
+                                double latitude = locationResult.getLocations().get(latestLocationIndex).getLatitude();
+                                double longitude = locationResult.getLocations().get(latestLocationIndex).getLongitude();
 
-                        //send the message
-                        sendLocation(mAuth.getUid(),userId,latitude, longitude);
-                    }
-                }
-            }, Looper.getMainLooper());
+                                //send the message
+                                sendLocation(mAuth.getUid(), userId, latitude, longitude);
+                            }
+                        }
+                    }, Looper.getMainLooper());
         }else{
             //gos is off, show dialog to send user to the setting to enable it
             new AlertDialog.Builder(MessageActivity.this )
@@ -450,6 +460,7 @@ public class MessageActivity extends AppCompatActivity {
                 Data data = new Data(""+mAuth.getUid(), ""+username +": "+message, "New Message",
                         ""+receiver,"ChatNotification" ,R.drawable.book_recycler_logo);
 
+                assert token != null;
                 Sender sender = new Sender(data, token.getToken());
 
                 //send the notification to cloud messaging, fcm json object request

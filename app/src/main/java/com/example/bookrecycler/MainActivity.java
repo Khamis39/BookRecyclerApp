@@ -9,6 +9,7 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -38,6 +39,7 @@ import com.example.bookrecycler.adapters.ItemAdapter;
 import com.example.bookrecycler.models.ItemModel;
 import com.example.bookrecycler.notification.Token;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.navigation.NavigationView;
@@ -48,8 +50,11 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.iid.FirebaseInstanceId;
+import com.google.firebase.installations.FirebaseInstallations;
+import com.google.firebase.installations.InstallationTokenResult;
 
 import java.util.ArrayList;
+import java.util.Objects;
 
 import de.hdodenhof.circleimageview.CircleImageView;
 
@@ -57,8 +62,6 @@ public class MainActivity extends AppCompatActivity {
 
     //views
     private SwipeRefreshLayout refreshLayout;
-    private FloatingActionButton Add_item_fab;
-    private ImageButton filterBtn;
     private EditText searchET;
     private ProgressDialog pd;
 
@@ -82,6 +85,7 @@ public class MainActivity extends AppCompatActivity {
     //boolean used to refresh the MainActivity when there are changes that affects it in another activity
     public static boolean refreshMainActivity = false;
 
+    @SuppressLint("InflateParams")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -94,8 +98,8 @@ public class MainActivity extends AppCompatActivity {
 
         //init views
         refreshLayout = findViewById(R.id.main_refresh_layout);
-        Add_item_fab = findViewById(R.id.Add_item_fab);
-        filterBtn =  findViewById(R.id.filterBtn);
+        FloatingActionButton add_item_fab = findViewById(R.id.Add_item_fab);
+        ImageButton filterBtn = findViewById(R.id.filterBtn);
         searchET = findViewById(R.id.searchET);
 
         //initialize firebase
@@ -156,14 +160,14 @@ public class MainActivity extends AppCompatActivity {
                         populateRV(); //to refresh after sign out
                         break;
                 }
-                //close drawer after clicking an item
+                //close drawer after clicking an item with an animation called gradvityCompat
                 drawerLayout.closeDrawer(GravityCompat.START);
                 return true;
             }
         });
 
         //Open AddItemActivity when clicking floating add btn
-        Add_item_fab.setOnClickListener(new View.OnClickListener() {
+        add_item_fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 //check if user logged
@@ -171,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
                     startActivity(new Intent(MainActivity.this, AddItemActivity.class));
                 }else{
                     startActivity(new Intent(MainActivity.this, LoginAndRegisterActivity.class));
+                    Toast.makeText(MainActivity.this, "You Must Login or Register to Upload an Item", Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -187,12 +192,12 @@ public class MainActivity extends AppCompatActivity {
         searchET.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
+                //No need of it for now
             }
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-
+                //no need for it now
             }
 
             @Override
@@ -250,13 +255,14 @@ public class MainActivity extends AppCompatActivity {
             final TextView headerNameTV = headerView.findViewById(R.id.nav_header_name_tv);
             final TextView headerEmailTV = headerView.findViewById(R.id.nav_header_email_tv);
             final CircleImageView headerIV = headerView.findViewById(R.id.nav_header_iv);
-            firestore.collection("Users").document(mAuth.getUid()).get().addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
+            firestore.collection("Users").document(Objects.requireNonNull(mAuth.getUid())).get().addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
                 @Override
                 public void onSuccess(DocumentSnapshot documentSnapshot) {
                     //assign values to header views
                     headerNameTV.setText(documentSnapshot.getString("name"));
                     headerEmailTV.setText(documentSnapshot.getString("email"));
                     String profileImgUrl = documentSnapshot.getString("img_url");
+                    assert profileImgUrl != null;
                     if (!profileImgUrl.equals("default")) {
                         RequestOptions requestOptions = new RequestOptions().placeholder(R.drawable.user_profile);
                         Glide.with(MainActivity.this).setDefaultRequestOptions(requestOptions).load(profileImgUrl).into(headerIV);
@@ -472,7 +478,7 @@ public class MainActivity extends AppCompatActivity {
         //get the badge
         final TextView badge = (TextView)navigationView.getMenu().findItem(R.id.nav_log_chats).getActionView();
         //run query, set visibility of the badge if there is new msgs
-        firestore.collection("Chatlist").document(mAuth.getUid()).collection("Contacted").get().addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
+        firestore.collection("Chatlist").document(Objects.requireNonNull(mAuth.getUid())).collection("Contacted").get().addOnSuccessListener(new OnSuccessListener<QuerySnapshot>() {
             @Override
             public void onSuccess(QuerySnapshot queryDocumentSnapshots) {
                 if(queryDocumentSnapshots!=null) {
@@ -529,6 +535,7 @@ public class MainActivity extends AppCompatActivity {
             editor.apply();
             //update token
             updateToken(FirebaseInstanceId.getInstance().getToken());
+           // updateToken(FirebaseInstallations.getInstance().getToken(true));
         }
     }
 
@@ -545,13 +552,19 @@ public class MainActivity extends AppCompatActivity {
             editor.putString("Current_USERID",user.getUid());
             editor.apply();
             //update token
-            updateToken(FirebaseInstanceId.getInstance().getToken());
+            updateToken(FirebaseInstanceId.getInstance().getToken());// take a look at the this method. its depracted.
+            //let's try to change it to new one
+          //  updateToken(FirebaseInstallations.getInstance().getToken(false));
         }
     }
 
+//    private void updateToken(Task<InstallationTokenResult> token) {
+//        firestore.collection("Token1").document(Objects.requireNonNull(mAuth.getUid())).set(token);
+//    }
+
     public void updateToken(String token){
         Token mToken = new Token(token);
-        firestore.collection("Tokens").document(mAuth.getUid()).set(mToken);
+        firestore.collection("Tokens").document(Objects.requireNonNull(mAuth.getUid())).set(mToken);
     }
 
     //Option menu
